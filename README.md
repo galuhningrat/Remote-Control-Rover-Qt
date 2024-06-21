@@ -1,5 +1,3 @@
-Berikut adalah analisis program Anda yang telah diimprove dengan gaya bahasa yang lebih intelektual dan ilmiah, sesuai untuk README GitHub atau skripsi:
-
 # Sistem Kendali Jarak Jauh untuk Kendaraan Otonom
 
 ## Deskripsi Proyek
