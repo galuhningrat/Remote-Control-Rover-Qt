@@ -3,6 +3,9 @@
 
 #include <QMainWindow>
 #include <QSerialPort>
+#include <QTimer>
+#include <QLCDNumber>
+#include <QProgressBar>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -21,12 +24,14 @@ private slots:
     void moveBackward();
     void turnLeft();
     void turnRight();
-    void changeSpeed(int speed);
     void updateSensorData();
+    void readBatteryData();
 
 private:
     Ui::MainWindow *ui;
     QSerialPort *serial;
+    QSerialPort *batterySerial;
+    QTimer *batteryTimer;
 };
 
 #endif // MAINWINDOW_H
