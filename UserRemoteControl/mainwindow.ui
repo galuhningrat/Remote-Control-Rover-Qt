@@ -89,7 +89,7 @@
        </widget>
       </item>
       <item>
-       <widget class="QProgressBar" name="batteryLabel">
+       <widget class="QProgressBar" name="persentase">
         <property name="value">
          <number>0</number>
         </property>

@@ -32,6 +32,9 @@ private:
     QSerialPort *serial;
     QSerialPort *batterySerial;
     QTimer *batteryTimer;
+    QProgressBar *powerProgressBar;
+    float maxExpectedPower;
+    QByteArray batteryDataBuffer;
 };
 
 #endif // MAINWINDOW_H

@@ -10,10 +10,12 @@ MainWindow::MainWindow(QWidget *parent)
     , ui(new Ui::MainWindow)
     , batterySerial(new QSerialPort(this))
     , batteryTimer(new QTimer(this))
+    , maxExpectedPower(6.0)
+    , batteryDataBuffer()
 {
     ui->setupUi(this);
 
-    // Menghubungkan sinyal dan slot
+    // Connect signals and slots
     connect(ui->forwardButton, &QPushButton::pressed, this, &MainWindow::moveForward);
     connect(ui->backwardButton, &QPushButton::pressed, this, &MainWindow::moveBackward);
     connect(ui->leftButton, &QPushButton::pressed, this, &MainWindow::turnLeft);
@@ -21,29 +23,47 @@ MainWindow::MainWindow(QWidget *parent)
 
     // Setup serial port
     serial = new QSerialPort(this);
-    serial->setPortName("COM3"); // Sesuaikan dengan port yang Anda gunakan
+    serial->setPortName("COM3"); // Adjust to your port
     serial->setBaudRate(QSerialPort::Baud9600);
-    serial->open(QIODevice::ReadWrite);
+    if (serial->open(QIODevice::ReadWrite)) {
+        connect(serial, &QSerialPort::readyRead, this, &MainWindow::updateSensorData);
+    } else {
+        qDebug() << "Failed to open main serial port.";
+    }
 
-    connect(serial, &QSerialPort::readyRead, this, &MainWindow::updateSensorData);
+    // Setup progress bar
+    powerProgressBar = ui->persentase;
+    powerProgressBar->setRange(0, 100);
+    powerProgressBar->setValue(0);
+    powerProgressBar->setTextVisible(true);
+    powerProgressBar->setStyleSheet(
+        "QProgressBar {"
+        "   border: 2px solid grey;"
+        "   border-radius: 5px;"
+        "   text-align: center;"
+        "}"
+        "QProgressBar::chunk {"
+        "   background-color: #05B8CC;"
+        "   width: 20px;"
+        "}"
+        );
 
     // Setup battery serial port
-    batterySerial->setPortName("COM10"); // Sesuaikan dengan port yang Anda gunakan
+    batterySerial->setPortName("COM10"); // Adjust to your port
     batterySerial->setBaudRate(QSerialPort::Baud115200);
     batterySerial->setDataBits(QSerialPort::Data8);
     batterySerial->setParity(QSerialPort::NoParity);
     batterySerial->setStopBits(QSerialPort::OneStop);
     batterySerial->setFlowControl(QSerialPort::NoFlowControl);
 
-    connect(batterySerial, &QSerialPort::readyRead, this, &MainWindow::readBatteryData);
-
     if (batterySerial->open(QIODevice::ReadOnly)) {
+        connect(batterySerial, &QSerialPort::readyRead, this, &MainWindow::readBatteryData);
         qDebug() << "Battery serial port opened successfully.";
     } else {
         qDebug() << "Failed to open battery serial port.";
     }
 
-    batteryTimer->start(2000);  // Update historical data every 2 seconds
+    batteryTimer->start(2000);  // Update battery data every 2 seconds
 }
 
 MainWindow::~MainWindow()
@@ -77,28 +97,27 @@ void MainWindow::updateSensorData() {
         ui->accelerometerLabel->setText(sensorData.at(3));
         ui->imuLabel->setText(sensorData.at(4));
         ui->ultrasonicLabel->setText(sensorData.at(5));
-
-        // Update QLCDNumber untuk kecepatan
         ui->speedLcd->display(sensorData.at(6).toInt());
     }
 }
 
 void MainWindow::readBatteryData() {
-    QByteArray data = batterySerial->readAll();
-    qDebug() << "Data received from battery serial port:" << data;
+    batteryDataBuffer.append(batterySerial->readAll());
 
-    QString dataString(data);
-    QStringList values = dataString.split(',');
+    while (batteryDataBuffer.contains('\n')) {
+        int newlineIndex = batteryDataBuffer.indexOf('\n');
+        QString dataString = batteryDataBuffer.left(newlineIndex).trimmed();
+        batteryDataBuffer.remove(0, newlineIndex + 1);
 
-    qDebug() << "Parsed values:" << values;
-
-    if (values.size() == 6) {
-        float voltage = values[0].toFloat(); // Misalkan nilai pertama adalah tegangan
-        int batteryPercentage = static_cast<int>((voltage / 4.2) * 100); // Konversi tegangan ke persentase
-
-        qDebug() << "Battery voltage:" << voltage;
-        qDebug() << "Battery percentage:" << batteryPercentage;
-
-        ui->batteryLabel->setValue(batteryPercentage);
+        QStringList values = dataString.split(',');
+        if (values.size() >= 3) {
+            float power = values.at(2).toFloat();
+            int percentage = qRound((power / maxExpectedPower) * 100);
+            percentage = qMin(percentage, 100);
+            powerProgressBar->setValue(percentage);
+            powerProgressBar->setFormat(QString("%1% (%2W / %3W)").arg(percentage).arg(power, 0, 'f', 1).arg(maxExpectedPower, 0, 'f', 1));
+        } else {
+            qDebug() << "Incomplete battery data received: " << dataString;
+        }
     }
 }
